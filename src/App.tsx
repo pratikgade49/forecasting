@@ -155,16 +155,26 @@ function App() {
   const handleGenerateForecast = async () => {
     // Validate configuration based on mode
     if (config.multiSelect) {
-      // Multi-selection mode validation
-      const selectedDimensions = [
-        config.selectedProducts && config.selectedProducts.length > 0,
-        config.selectedCustomers && config.selectedCustomers.length > 0,
-        config.selectedLocations && config.selectedLocations.length > 0
-      ].filter(Boolean).length;
-      
-      if (selectedDimensions < 2) {
-        setError('Please select at least 2 dimensions (Product, Customer, or Location) for multi-selection forecasting');
-        return;
+      if (config.advancedMode) {
+        // Advanced mode validation
+        if (!config.selectedProducts || config.selectedProducts.length === 0 ||
+            !config.selectedCustomers || config.selectedCustomers.length === 0 ||
+            !config.selectedLocations || config.selectedLocations.length === 0) {
+          setError('Advanced mode requires selection of Products, Customers, and Locations');
+          return;
+        }
+      } else {
+        // Multi-selection mode validation
+        const selectedDimensions = [
+          config.selectedProducts && config.selectedProducts.length > 0,
+          config.selectedCustomers && config.selectedCustomers.length > 0,
+          config.selectedLocations && config.selectedLocations.length > 0
+        ].filter(Boolean).length;
+        
+        if (selectedDimensions < 2) {
+          setError('Please select at least 2 dimensions (Product, Customer, or Location) for multi-selection forecasting');
+          return;
+        }
       }
     } else if (config.selectedItems && config.selectedItems.length > 1) {
       // Simple multi-select mode validation

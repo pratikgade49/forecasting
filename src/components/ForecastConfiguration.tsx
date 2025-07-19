@@ -375,14 +375,41 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
         {(showAdvanced || multiSelectMode) ? (
           /* Advanced/Multi-Selection Mode */
           <div className="space-y-4">
+            {multiSelectMode && (
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-200">
+                <div className="flex items-center space-x-3">
+                  <Target className="w-5 h-5 text-indigo-600" />
+                  <div>
+                    <h3 className="font-medium text-gray-900">Advanced Mode (Precise Combinations)</h3>
+                    <p className="text-sm text-gray-600">Generate forecasts for exact Product × Customer × Location combinations</p>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleAdvancedMode}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    advancedMode 
+                      ? 'bg-indigo-600 text-white' 
+                      : 'bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50'
+                  }`}
+                >
+                  {advancedMode ? 'Flexible Mode' : 'Advanced Mode'}
+                </button>
+              </div>
+            )}
+            
             <div className="flex items-center space-x-2 mb-4">
-              {multiSelectMode ? <Grid className="w-5 h-5 text-purple-600" /> : <Target className="w-5 h-5 text-blue-600" />}
+              {advancedMode ? <Target className="w-5 h-5 text-indigo-600" /> : <Grid className="w-5 h-5 text-purple-600" />}
               <h3 className="text-lg font-semibold text-gray-900">
-                {multiSelectMode ? 'Select Multiple Items (Flexible Combinations)' : 'Select Specific Combination'}
+                {advancedMode ? 'Select Items for Precise Combinations' : 'Select Multiple Items (Flexible Combinations)'}
               </h3>
-              {multiSelectMode && (
+              {multiSelectMode && !advancedMode && (
                 <p className="text-sm text-gray-600 ml-2">
                   Select at least 2 dimensions for combination forecasting
+                </p>
+              )}
+              {advancedMode && (
+                <p className="text-sm text-gray-600 ml-2">
+                  All three dimensions required for precise forecasting
                 </p>
               )}
             </div>
@@ -392,13 +419,14 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Package className="w-4 h-4 inline mr-1" />
-                  Product{multiSelectMode ? 's' : ''}
+                  Product{(multiSelectMode || advancedMode) ? 's' : ''}
+                  {advancedMode && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 
-                {multiSelectMode ? (
+                {(multiSelectMode || advancedMode) ? (
                   <div className="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
                     <div className="space-y-2">
-                      {productOptions.map((option) => (
+                      {filteredOptions.products.map((option) => (
                         <label key={option} className="flex items-center space-x-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -425,7 +453,7 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="">Select Product</option>
-                    {productOptions.map((option) => (
+                    {filteredOptions.products.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
@@ -438,13 +466,14 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Users className="w-4 h-4 inline mr-1" />
-                  Customer{multiSelectMode ? 's' : ''}
+                  Customer{(multiSelectMode || advancedMode) ? 's' : ''}
+                  {advancedMode && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 
-                {multiSelectMode ? (
+                {(multiSelectMode || advancedMode) ? (
                   <div className="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
                     <div className="space-y-2">
-                      {customerOptions.map((option) => (
+                      {filteredOptions.customers.map((option) => (
                         <label key={option} className="flex items-center space-x-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -471,7 +500,7 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="">Select Customer</option>
-                    {customerOptions.map((option) => (
+                    {filteredOptions.customers.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
@@ -484,13 +513,14 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <MapPin className="w-4 h-4 inline mr-1" />
-                  Location{multiSelectMode ? 's' : ''}
+                  Location{(multiSelectMode || advancedMode) ? 's' : ''}
+                  {advancedMode && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 
-                {multiSelectMode ? (
+                {(multiSelectMode || advancedMode) ? (
                   <div className="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
                     <div className="space-y-2">
-                      {locationOptions.map((option) => (
+                      {filteredOptions.locations.map((option) => (
                         <label key={option} className="flex items-center space-x-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -517,7 +547,7 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="">Select Location</option>
-                    {locationOptions.map((option) => (
+                    {filteredOptions.locations.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
@@ -527,7 +557,7 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
               </div>
             </div>
             
-            {multiSelectMode && (
+            {multiSelectMode && !advancedMode && (
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <div className="flex items-start space-x-3">
                   <Grid className="w-5 h-5 text-purple-600 mt-0.5" />
@@ -562,6 +592,30 @@ export const ForecastConfiguration: React.FC<ForecastConfigurationProps> = ({
                           return total;
                         })()
                       }</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {advancedMode && (
+              <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <Target className="w-5 h-5 text-indigo-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-indigo-900">Advanced Mode Summary</h4>
+                    <div className="text-sm text-indigo-700 mt-1 space-y-1">
+                      <p><strong>Products:</strong> {(config.selectedProducts || []).length} selected</p>
+                      <p><strong>Customers:</strong> {(config.selectedCustomers || []).length} selected</p>
+                      <p><strong>Locations:</strong> {(config.selectedLocations || []).length} selected</p>
+                      <p><strong>Precise Combinations:</strong> {
+                        (config.selectedProducts || []).length * 
+                        (config.selectedCustomers || []).length * 
+                        (config.selectedLocations || []).length
+                      }</p>
+                      <p className="text-xs text-indigo-600 mt-2">
+                        Each Product-Customer-Location combination will be forecasted separately without aggregation.
+                      </p>
                     </div>
                   </div>
                 </div>
