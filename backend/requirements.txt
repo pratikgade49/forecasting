@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn
+python-multipart
+openpyxl
+python-dateutil
+scipy
+pydantic
+xlsxwriter
+mysql-connector-python
+sqlalchemy
+pymysql
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
