@@ -82,6 +82,7 @@ class ForecastConfig(BaseModel):
     historicPeriod: int = 12
     forecastPeriod: int = 6
     multiSelect: bool = False  # Flag to indicate multi-selection mode
+    advancedMode: bool = False  # Flag to indicate advanced mode (precise combinations)
     externalFactors: Optional[List[str]] = None
 
 class DataPoint(BaseModel):
@@ -302,6 +303,43 @@ class ForecastingEngine:
             # Single dimension grouping (original behavior)
             aggregated = df_reset.groupby('period_group')['quantity'].sum().reset_index()
             aggregated['date'] = aggregated['period_group'].dt.start_time
+        
+        # Add period labels
+        aggregated['period'] = aggregated['date'].apply(
+            lambda x: ForecastingEngine.format_period(pd.Timestamp(x), interval)
+        )
+        
+        # Clean up
+        aggregated = aggregated.drop('period_group', axis=1)
+        
+        return aggregated.reset_index(drop=True)
+    
+    @staticmethod
+    def aggregate_advanced_mode(df: pd.DataFrame, interval: str) -> pd.DataFrame:
+        """
+        Aggregate data for advanced mode (Product-Customer-Location-Date combinations)
+        No aggregation across dimensions - keeps unique combinations intact
+        """
+        df = df.copy()
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # Create period groupings without aggregating across dimensions
+        if interval == 'week':
+            df['period_group'] = df['date'].dt.to_period('W-MON')
+        elif interval == 'month':
+            df['period_group'] = df['date'].dt.to_period('M')
+        elif interval == 'year':
+            df['period_group'] = df['date'].dt.to_period('Y')
+        else:
+            df['period_group'] = df['date'].dt.to_period('M')
+        
+        # Group by all dimensions plus period to preserve unique combinations
+        # This ensures Product-Customer-Location-Date combinations remain distinct
+        group_cols = ['product', 'customer', 'location', 'period_group']
+        aggregated = df.groupby(group_cols)['quantity'].sum().reset_index()
+        
+        # Convert period back to timestamp
+        aggregated['date'] = aggregated['period_group'].dt.start_time
         
         # Add period labels
         aggregated['period'] = aggregated['date'].apply(
@@ -2374,21 +2412,41 @@ async def get_database_options(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting database options: {str(e)}")
 
-@app.get("/get_customer_by_product/:id")
+@app.post("/database/filtered_options")
 async def get_filtered_options(
+    filters: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get unique values for dropdowns from database"""
+    """Get filtered unique values for dropdowns based on selected filters"""
     try:
-        products = db.query(distinct(ForecastData.customer)).filter(ForecastData.product == id).all()
+        # Start with base query
+        query = db.query(ForecastData)
+        
+        # Apply filters
+        selected_products = filters.get('selectedProducts', [])
+        selected_customers = filters.get('selectedCustomers', [])
+        selected_locations = filters.get('selectedLocations', [])
+        
+        if selected_products:
+            query = query.filter(ForecastData.product.in_(selected_products))
+        if selected_customers:
+            query = query.filter(ForecastData.customer.in_(selected_customers))
+        if selected_locations:
+            query = query.filter(ForecastData.location.in_(selected_locations))
+        
+        # Get filtered unique values
+        products = query.with_entities(distinct(ForecastData.product)).filter(ForecastData.product.isnot(None)).all()
+        customers = query.with_entities(distinct(ForecastData.customer)).filter(ForecastData.customer.isnot(None)).all()
+        locations = query.with_entities(distinct(ForecastData.location)).filter(ForecastData.location.isnot(None)).all()
+        
         return {
             "products": sorted([p[0] for p in products if p[0]]),
             "customers": sorted([c[0] for c in customers if c[0]]),
             "locations": sorted([l[0] for l in locations if l[0]])
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting database options: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting filtered options: {str(e)}")
     
 @app.get("/external_factors")
 async def get_external_factors(
@@ -2938,28 +2996,39 @@ async def generate_forecast(
     """Generate forecast using data from database"""
     try:
         print(f"Received forecast request: multiSelect={config.multiSelect}")
+        print(f"Advanced mode: {config.advancedMode}")
         print(f"Selected products: {config.selectedProducts}")
         print(f"Selected customers: {config.selectedCustomers}")
         print(f"Selected locations: {config.selectedLocations}")
         print(f"Selected items: {config.selectedItems}")
         
         if config.multiSelect:
-            # Multi-selection mode - check if it's flexible multi-select or simple multi-select
-            selected_dimensions = 0
-            if config.selectedProducts: selected_dimensions += 1
-            if config.selectedCustomers: selected_dimensions += 1
-            if config.selectedLocations: selected_dimensions += 1
-            
-            print(f"Multi-select mode: {selected_dimensions} dimensions selected")
-            
-            if selected_dimensions >= 2:
-                # Advanced multi-select mode (2 or 3 dimensions)
-                print("Running advanced multi-select mode")
-                result = ForecastingEngine.generate_multi_forecast(db, config)
+            if config.advancedMode:
+                # Advanced mode: precise Product-Customer-Location combinations
+                print("Running advanced mode (precise combinations)")
+                # Check if all three dimensions are selected for advanced mode
+                if not (config.selectedProducts and config.selectedCustomers and config.selectedLocations):
+                    raise ValueError("Advanced mode requires selection of Products, Customers, and Locations")
+                result = ForecastingEngine.generate_forecast_three_dimensions(db, config, 
+                    config.selectedProducts, config.selectedCustomers, config.selectedLocations)
                 return result
             else:
-                # This shouldn't happen with proper frontend validation
-                raise ValueError("Multi-select mode requires at least 2 dimensions")
+                # Multi-selection mode - check if it's flexible multi-select or simple multi-select
+                selected_dimensions = 0
+                if config.selectedProducts: selected_dimensions += 1
+                if config.selectedCustomers: selected_dimensions += 1
+                if config.selectedLocations: selected_dimensions += 1
+                
+                print(f"Multi-select mode: {selected_dimensions} dimensions selected")
+                
+                if selected_dimensions >= 2:
+                    # Flexible multi-select mode (2 or 3 dimensions with aggregation)
+                    print("Running flexible multi-select mode")
+                    result = ForecastingEngine.generate_multi_forecast(db, config)
+                    return result
+                else:
+                    # This shouldn't happen with proper frontend validation
+                    raise ValueError("Multi-select mode requires at least 2 dimensions")
         elif config.selectedItems and len(config.selectedItems) > 1:
             # Simple mode multi-select
             print("Running simple multi-select mode")

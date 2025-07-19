@@ -34,6 +34,7 @@ export interface ForecastConfig {
   historicPeriod: number;
   forecastPeriod: number;
   multiSelect?: boolean;  // Flag for multi-selection mode
+  advancedMode?: boolean;  // Flag for advanced mode (precise combinations)
   externalFactors?: string[];  // Add external factors support
 }
 
@@ -330,6 +331,31 @@ export class ApiService {
     
     if (!response.ok) {
       throw new Error('Failed to fetch database options');
+    }
+
+    return response.json();
+  }
+
+  static async getFilteredOptions(filters: {
+    selectedProducts?: string[];
+    selectedCustomers?: string[];
+    selectedLocations?: string[];
+  }): Promise<{
+    products: string[];
+    customers: string[];
+    locations: string[];
+  }> {
+    const response = await fetch(`${API_BASE_URL}/database/filtered_options`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
+      },
+      body: JSON.stringify(filters),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch filtered options');
     }
 
     return response.json();
