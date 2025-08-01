@@ -18,6 +18,7 @@ import {
   Save
 } from 'lucide-react';
 import { MultiForecastResult } from '../services/api';
+import { ForecastConfig } from '../services/api';
 import { saveAs } from 'file-saver';
 
 ChartJS.register(

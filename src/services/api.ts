@@ -238,6 +238,18 @@ export interface SaveForecastRequest {
   forecast_config: ForecastConfig;
   forecast_data: ForecastResult | MultiForecastResult;
 }
+
+export interface SavedForecastResponse {
+  id: number;
+  user_id: number;
+  name: string;
+  description?: string;
+  forecast_config: ForecastConfig;
+  forecast_data: ForecastResult | MultiForecastResult;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FactorCoverageValidation {
     [factorName: string]: {
         coverage: number;

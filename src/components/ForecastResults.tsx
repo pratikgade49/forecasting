@@ -14,7 +14,7 @@ import {
 import { BarChart3, TrendingUp, TrendingDown, Minus, Target, Award, Brain, Eye, EyeOff, Plus, GitCompare } from 'lucide-react';
 import { Terminal } from 'lucide-react';
 import { Save } from 'lucide-react';
-import { ForecastResult } from '../services/api';
+import { ForecastResult, ForecastConfig } from '../services/api';
 import { saveAs } from 'file-saver';
 import { AdvancedCharts } from './AdvancedCharts';
 import { AccuracyTracker } from './AccuracyTracker';

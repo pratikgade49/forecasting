@@ -71,23 +71,6 @@ class User(Base):
         return pwd_context.hash(password)
     
 class ForecastData(Base):
-class SavedForecastResult(Base):
-    """Model for storing user's saved forecast results"""
-    __tablename__ = "saved_forecast_results"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)  # Foreign key to users table
-    name = Column(String(255), nullable=False)
-    description = Column(TEXT, nullable=True)
-    forecast_config = Column(TEXT, nullable=False)  # JSON string of ForecastConfig
-    forecast_data = Column(TEXT, nullable=False)  # JSON string of ForecastResult
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Unique constraint for user + name combination
-    __table_args__ = (
-        UniqueConstraint('user_id', 'name', name='unique_user_forecast_name'),
-    )
     """Model for storing forecast data from Excel uploads"""
     __tablename__ = "forecast_data"
     
@@ -115,6 +98,24 @@ class SavedForecastResult(Base):
             'product', 'customer', 'location', 'date',
             name='unique_forecast_record'
         ),
+    )
+
+class SavedForecastResult(Base):
+    """Model for storing user's saved forecast results"""
+    __tablename__ = "saved_forecast_results"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)  # Foreign key to users table
+    name = Column(String(255), nullable=False)
+    description = Column(TEXT, nullable=True)
+    forecast_config = Column(TEXT, nullable=False)  # JSON string of ForecastConfig
+    forecast_data = Column(TEXT, nullable=False)  # JSON string of ForecastResult
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Unique constraint for user + name combination
+    __table_args__ = (
+        UniqueConstraint('user_id', 'name', name='unique_user_forecast_name'),
     )
 
 class ForecastConfiguration(Base):

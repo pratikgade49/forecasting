@@ -785,6 +785,29 @@ function App() {
           processLog={currentProcessLog}
           title="Forecast Generation Process Log"
         />
+
+        {/* Save Forecast Modal */}
+        {showSaveForecastModal && forecastResult && forecastConfigToSave && (
+          <SaveForecastModal
+            isOpen={showSaveForecastModal}
+            onClose={() => setShowSaveForecastModal(false)}
+            forecastResult={forecastResult}
+            forecastConfig={forecastConfigToSave}
+            onSaveSuccess={() => {
+              setShowSaveForecastModal(false);
+              alert('Forecast saved successfully!');
+              loadDatabaseStats();
+              loadUniqueOptions();
+            }}
+          />
+        )}
+
+        {/* Saved Forecasts Manager */}
+        <SavedForecastsManager
+          isOpen={showSavedForecastsManager}
+          onClose={() => setShowSavedForecastsManager(false)}
+          onViewForecast={handleViewSavedForecast}
+        />
       </main>
     </div>
   );

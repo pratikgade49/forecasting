@@ -187,6 +187,22 @@ class FredDataResponse(BaseModel):
     series_processed: int
     series_details: List[Dict[str, Any]]
 
+class SavedForecastRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    forecast_config: ForecastConfig
+    forecast_data: Union[ForecastResult, MultiForecastResult]
+
+class SavedForecastResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    description: Optional[str] = None
+    forecast_config: ForecastConfig
+    forecast_data: Union[ForecastResult, MultiForecastResult]
+    created_at: str
+    updated_at: str
+
 class DatabaseStats(BaseModel):
     totalRecords: int
     dateRange: Dict[str, str]
