@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Union
 import io
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
@@ -4555,7 +4557,7 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 # Add a global flag to enable/disable caching
-ENABLE_MODEL_CACHE = False
+ENABLE_MODEL_CACHE = True  # Enable caching to improve performance with parallel execution
 
 @app.post("/forecast")
 async def generate_forecast(
