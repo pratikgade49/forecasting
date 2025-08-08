@@ -17,6 +17,7 @@ import io
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import os
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
@@ -619,17 +620,28 @@ class ForecastingEngine:
                     algorithms = [alg for alg in ForecastingEngine.ALGORITHMS.keys() if alg != "best_fit"]
                     algorithm_results = []
                     
-                    for algorithm in algorithms:
-                        try:
-                            if process_log is not None:
-                                process_log.append(f"Testing algorithm: {algorithm}")
-                            
-                            result = ForecastingEngine.run_algorithm(algorithm, aggregated_df, single_config, save_model=False)
-                            algorithm_results.append(result)
-                        except Exception as e:
-                            if process_log is not None:
-                                process_log.append(f"Algorithm {algorithm} failed: {str(e)}")
-                            continue
+                    # Use parallel execution for simple multi-forecast best fit as well
+                    max_workers = min(len(algorithms), os.cpu_count() or 4)
+                    if process_log is not None:
+                        process_log.append(f"Running parallel best fit with {max_workers} workers...")
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_to_algorithm = {
+                            executor.submit(ForecastingEngine.run_algorithm, algorithm, aggregated_df, single_config, save_model=False): algorithm
+                            for algorithm in algorithms
+                        }
+
+                        for future in as_completed(future_to_algorithm):
+                            algorithm_name = future_to_algorithm[future]
+                            try:
+                                result = future.result()
+                                algorithm_results.append(result)
+                                if process_log is not None:
+                                    process_log.append(f"✅ Algorithm {algorithm_name} completed for {item}")
+                            except Exception as exc:
+                                if process_log is not None:
+                                    process_log.append(f"❌ Algorithm {algorithm_name} failed for {item}: {str(exc)}")
+                                continue
                     
                     if not algorithm_results:
                         if process_log is not None:
@@ -2946,33 +2958,74 @@ class ForecastingEngine:
             if process_log is not None:
                 process_log.append("Running best fit algorithm selection...")
             
-            algorithms = [alg for alg in ForecastingEngine.ALGORITHMS.keys() if alg != "best_fit"]
-            results = []
+            algorithms_to_test = [alg for alg in ForecastingEngine.ALGORITHMS.keys() if alg != "best_fit"]
+            algorithm_results = []
             best_model = None
             best_algorithm = None
             best_metrics = None
             
-            for algorithm in algorithms:
-                if process_log is not None:
-                    process_log.append(f"Testing algorithm: {algorithm}")
-                
-                result = ForecastingEngine.run_algorithm(algorithm, aggregated_df, config, save_model=False)
-                results.append(result)
-                if best_metrics is None or result.accuracy > best_metrics['accuracy']:
-                    best_metrics = {
-                        'accuracy': result.accuracy,
-                        'mae': result.mae,
-                        'rmse': result.rmse
-                    }
-                    best_model = result
-                    best_algorithm = algorithm
+            # Use ThreadPoolExecutor for parallel execution
+            max_workers = min(len(algorithms_to_test), os.cpu_count() or 4)
+            if process_log is not None:
+                process_log.append(f"Starting parallel execution with {max_workers} workers for {len(algorithms_to_test)} algorithms...")
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all algorithm tasks
+                future_to_algorithm = {
+                    executor.submit(ForecastingEngine.run_algorithm, algorithm, aggregated_df, config, save_model=False): algorithm
+                    for algorithm in algorithms_to_test
+                }
+
+                # Collect results as they complete
+                for future in as_completed(future_to_algorithm):
+                    algorithm_name = future_to_algorithm[future]
+                    try:
+                        result = future.result()
+                        algorithm_results.append(result)
+                        if process_log is not None:
+                            process_log.append(f"✅ Algorithm {algorithm_name} completed with accuracy: {result.accuracy:.2f}%")
+                        
+                        # Track best performing algorithm
+                        if best_metrics is None or result.accuracy > best_metrics['accuracy']:
+                            best_metrics = {
+                                'accuracy': result.accuracy,
+                                'mae': result.mae,
+                                'rmse': result.rmse
+                            }
+                            best_model = result
+                            best_algorithm = algorithm_name
+                            
+                    except Exception as exc:
+                        if process_log is not None:
+                            process_log.append(f"❌ Algorithm {algorithm_name} failed: {str(exc)}")
+                        # Create a dummy result for failed algorithms to maintain structure
+                        algorithm_results.append(AlgorithmResult(
+                            algorithm=ForecastingEngine.ALGORITHMS[algorithm_name],
+                            accuracy=0.0,
+                            mae=999.0,
+                            rmse=999.0,
+                            historicData=[],
+                            forecastData=[],
+                            trend='stable'
+                        ))
             
-            if not results:
+            # Filter out failed results for ensemble calculation
+            successful_results = [res for res in algorithm_results if res.accuracy > 0]
+            if not successful_results:
+                raise ValueError("All algorithms failed to produce valid results")
+            
+            if process_log is not None:
+                process_log.append(f"Parallel execution completed. {len(successful_results)} algorithms succeeded, {len(algorithm_results) - len(successful_results)} failed.")
+            
+            if not algorithm_results:
                 raise ValueError("No algorithms produced valid results")
             
             # Ensemble: average forecast of top 3 algorithms by accuracy
-            top3 = sorted(results, key=lambda x: -x.accuracy)[:3]
+            top3 = sorted(successful_results, key=lambda x: -x.accuracy)[:3]
             if len(top3) >= 2:
+                if process_log is not None:
+                    process_log.append(f"Creating ensemble from top {len(top3)} algorithms...")
+                
                 n_forecast = len(top3[0].forecastData) if top3[0].forecastData else 0
                 avg_forecast = []
                 for i in range(n_forecast):
@@ -2996,10 +3049,13 @@ class ForecastingEngine:
                     forecastData=avg_forecast,
                     trend=top3[0].trend
                 )
-                results.append(ensemble_result)
+                algorithm_results.append(ensemble_result)
             
             # Save the best_fit model configuration
             try:
+                if process_log is not None:
+                    process_log.append(f"Saving best fit model configuration (best algorithm: {best_algorithm})...")
+                
                 ModelPersistenceManager.save_model(
                     db, None, "best_fit", config.dict(),
                     aggregated_df['quantity'].values, 
@@ -3008,6 +3064,8 @@ class ForecastingEngine:
                 )
             except Exception as e:
                 print(f"Failed to save best_fit model: {e}")
+                if process_log is not None:
+                    process_log.append(f"Warning: Failed to save best_fit model: {e}")
             
             # Generate config hash for tracking
             config_hash = ModelPersistenceManager.generate_config_hash(config.dict())
@@ -3020,7 +3078,7 @@ class ForecastingEngine:
                 historicData=best_model.historicData,
                 forecastData=best_model.forecastData,
                 trend=best_model.trend,
-                allAlgorithms=results,
+                allAlgorithms=algorithm_results,
                 configHash=config_hash,
                 processLog=process_log
             )
@@ -3081,17 +3139,30 @@ class ForecastingEngine:
                     
                     algorithms = [alg for alg in ForecastingEngine.ALGORITHMS.keys() if alg != "best_fit"]
                     algorithm_results = []
-                    for algorithm in algorithms:
-                        try:
-                            if process_log is not None:
-                                process_log.append(f"Testing algorithm: {algorithm}")
-                            
-                            result = ForecastingEngine.run_algorithm(algorithm, aggregated_df, config, save_model=False)
-                            algorithm_results.append(result)
-                        except Exception as e:
-                            if process_log is not None:
-                                process_log.append(f"Algorithm {algorithm} failed: {str(e)}")
-                            continue
+                    
+                    # Use parallel execution for three-dimension best fit
+                    max_workers = min(len(algorithms), os.cpu_count() or 4)
+                    if process_log is not None:
+                        process_log.append(f"Running parallel best fit with {max_workers} workers...")
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_to_algorithm = {
+                            executor.submit(ForecastingEngine.run_algorithm, algorithm, aggregated_df, single_config, save_model=False): algorithm
+                            for algorithm in algorithms
+                        }
+
+                        for future in as_completed(future_to_algorithm):
+                            algorithm_name = future_to_algorithm[future]
+                            try:
+                                result = future.result()
+                                algorithm_results.append(result)
+                                if process_log is not None:
+                                    process_log.append(f"✅ Algorithm {algorithm_name} completed for {product}+{customer}+{location}")
+                            except Exception as exc:
+                                if process_log is not None:
+                                    process_log.append(f"❌ Algorithm {algorithm_name} failed for {product}+{customer}+{location}: {str(exc)}")
+                                continue
+                    
                     if not algorithm_results:
                         if process_log is not None:
                             process_log.append("No algorithms produced valid results")
@@ -3344,17 +3415,29 @@ class ForecastingEngine:
                     
                     algorithms = [alg for alg in ForecastingEngine.ALGORITHMS.keys() if alg != "best_fit"]
                     algorithm_results = []
-                    for algorithm in algorithms:
-                        try:
-                            if process_log is not None:
-                                process_log.append(f"Testing algorithm: {algorithm}")
-                            
-                            result = ForecastingEngine.run_algorithm(algorithm, aggregated_df, algo_config, save_model=False)
-                            algorithm_results.append(result)
-                        except Exception as e:
-                            if process_log is not None:
-                                process_log.append(f"Algorithm {algorithm} failed: {e}")
-                            continue
+                    
+                    # Use parallel execution for two-dimension best fit
+                    max_workers = min(len(algorithms), os.cpu_count() or 4)
+                    if process_log is not None:
+                        process_log.append(f"Running parallel best fit with {max_workers} workers...")
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_to_algorithm = {
+                            executor.submit(ForecastingEngine.run_algorithm, algorithm, aggregated_df, algo_config, save_model=False): algorithm
+                            for algorithm in algorithms
+                        }
+
+                        for future in as_completed(future_to_algorithm):
+                            algorithm_name = future_to_algorithm[future]
+                            try:
+                                result = future.result()
+                                algorithm_results.append(result)
+                                if process_log is not None:
+                                    process_log.append(f"✅ Algorithm {algorithm_name} completed for {combination_type}: {dim1_value}+{dim2_value}")
+                            except Exception as exc:
+                                if process_log is not None:
+                                    process_log.append(f"❌ Algorithm {algorithm_name} failed for {combination_type}: {dim1_value}+{dim2_value}: {str(exc)}")
+                                continue
                     
                     if not algorithm_results:
                         if process_log is not None:
