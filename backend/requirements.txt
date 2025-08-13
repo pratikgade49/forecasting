@@ -9,9 +9,8 @@ python-dateutil
 scipy
 pydantic
 xlsxwriter
-mysql-connector-python
+psycopg2-binary
 sqlalchemy
-pymysql
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart

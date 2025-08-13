@@ -5155,9 +5155,9 @@ async def download_multi_forecast_excel(
         raise HTTPException(status_code=500, detail=f"Error generating multi-forecast Excel: {str(e)}")
 if __name__ == "__main__":
     import uvicorn # type: ignore
-    print("🚀 Advanced Multi-variant Forecasting API with MySQL")
+    print("🚀 Advanced Multi-variant Forecasting API with PostgreSQL")
     print("📊 23 Algorithms + Best Fit Available")
-    print("🗄️  MySQL Database Integration")
+    print("🗄️  PostgreSQL Database Integration")
     print("🌐 Server starting on http://localhost:8000")
     print("📈 Frontend should be available on http://localhost:5173")
     print("⏹️  Press Ctrl+C to stop the server\n")

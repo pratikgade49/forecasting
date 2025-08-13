@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database table setup script for MySQL
+Database table setup script for PostgreSQL
 Assumes the database already exists and only creates tables
 """
 
@@ -8,16 +8,16 @@ import os
 from database import init_database
 
 def setup_tables():
-    """Setup database tables (assumes database already exists)"""
+    """Setup PostgreSQL database tables (assumes database already exists)"""
     try:
-        print("🗄️  Setting up database tables...")
+        print("🗄️  Setting up PostgreSQL database tables...")
         print("=" * 60)
         
         # Check environment variables
-        print("Database Configuration:")
+        print("PostgreSQL Database Configuration:")
         print(f"Host: {os.getenv('DB_HOST', 'localhost')}")
-        print(f"Port: {os.getenv('DB_PORT', '3306')}")
-        print(f"User: {os.getenv('DB_USER', 'root')}")
+        print(f"Port: {os.getenv('DB_PORT', '5432')}")
+        print(f"User: {os.getenv('DB_USER', 'postgres')}")
         print(f"Database: {os.getenv('DB_NAME', 'forecasting_db')}")
         print()
         
@@ -32,12 +32,16 @@ def setup_tables():
             print("- forecast_data (stores uploaded forecast data)")
             print("- external_factor_data (stores external factor data)")
             print("- forecast_configurations (stores saved configurations)")
+            print("- users (stores user authentication data)")
+            print("- saved_forecast_results (stores saved forecast results)")
+            print("- saved_models (stores cached models)")
+            print("- model_accuracy_history (stores model accuracy tracking)")
             print("\nYou can now start the application with: python main.py")
             return True
         else:
             print("\n❌ Database setup failed. Please check the error messages above.")
             print("\nTroubleshooting:")
-            print("1. Ensure MySQL server is running")
+            print("1. Ensure PostgreSQL server is running")
             print("2. Verify the database 'forecasting_db' exists")
             print("3. Check database credentials in .env file")
             print("4. Ensure user has CREATE TABLE privileges")

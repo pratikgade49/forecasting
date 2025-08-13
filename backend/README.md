@@ -349,6 +349,6 @@ The application provides real-time database statistics including:
 - Data can be queried and filtered efficiently
 
 ### Backup and Recovery
-- Regular MySQL backups recommended
-- Export data using standard MySQL tools
+- Regular PostgreSQL backups recommended
+- Export data using standard PostgreSQL tools (pg_dump)
 - Database schema can be recreated using setup script

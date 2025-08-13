@@ -189,18 +189,18 @@ def get_db():
         db.close()
 
 def init_database():
-    """Initialize database tables (assumes database already exists)"""
+    """Initialize PostgreSQL database tables (assumes database already exists)"""
     try:
         # Test connection first
         with engine.connect() as connection:
-            print("✅ Database connection successful!")
+            print("✅ PostgreSQL database connection successful!")
         
         # Create tables if they don't exist
         return create_tables()
     except Exception as e:
-        print(f"❌ Error initializing database: {e}")
+        print(f"❌ Error initializing PostgreSQL database: {e}")
         print("Please ensure:")
-        print("1. MySQL server is running")
+        print("1. PostgreSQL server is running")
         print("2. Database 'forecasting_db' exists")
         print("3. User has proper permissions")
         return False
